@@ -27,6 +27,12 @@ async function handleUpdate(update) {
   const text         = msg.text || "";
   const isOrderGroup = (chatId === GROUP_1 || chatId === GROUP_2);
 
+  // ── Respond to direct messages ─────────────────────
+  if (!isOrderGroup) {
+    await sendMessage(chatId, "✅ KORD Bot is running and watching order groups.");
+    return;
+  }
+
   if (isOrderGroup && isOrder(text)) {
     await validateOrder(msg);
   }
