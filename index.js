@@ -100,9 +100,10 @@ async function validateOrder(msg) {
 function extractField(text, pattern) {
   const cleaned = text.replace(/\[([^\]]+)\]\(tel:[^\)]+\)/g, "$1");
   const re = new RegExp(
-    `(?:^|\\n)\\s*(?:${pattern})\\s*:?\\s*(.+?)(?=\\n|$)`, "im"
+    `(?:^|\\n)\\s*(?:${pattern})\\s*:?\\s*([^\\n]*)`, "im"
   );
-  return (cleaned.match(re) || [])[1]?.trim() || "";
+  const match = (cleaned.match(re) || [])[1]?.trim() || "";
+  return match;
 }
 
 async function sendMessage(chatId, text, replyToId) {
