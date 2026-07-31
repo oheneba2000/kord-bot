@@ -39,7 +39,17 @@ async function handleUpdate(update) {
 }
 
 function isOrder(text) {
-  return /name|customer|contact|location|operator/i.test(text);
+  const fieldCount = [
+    /^name\s*:/im,
+    /^customer\s*:/im,
+    /^contact\s*:/im,
+    /^location\s*:/im,
+    /^product\s*:/im,
+    /^operator\s*:/im,
+    /^date\s*:/im
+  ].filter(re => re.test(text)).length;
+
+  return fieldCount >= 3;
 }
 
 async function validateOrder(msg) {
