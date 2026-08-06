@@ -164,10 +164,9 @@ async function validateOrder(msg) {
 
       // ── Log contact with 3-day expiry ────────────────
       await redisSet(
-        `contact:${stripped}`,
-        JSON.stringify({ name: name.trim(), timestamp: Date.now() }),
-        3 * 24 * 60 * 60 // 3 days in seconds
-      );
+  `contact:${stripped}`,
+  JSON.stringify({ name: name.trim(), timestamp: Date.now() })
+);
 
     } catch(e) {
       console.error("Redis error:", e);
@@ -185,7 +184,10 @@ async function redisGet(key) {
 }
 
 async function redisSet(key, value, exSeconds) {
-  await fetch(`${UPSTASH_URL}/set/${encodeURIComponent(key)}/${encodeURIComponent(value)}/ex/${exSeconds}`, {
+  const url = exSeconds
+    ? `${UPSTASH_URL}/set/${encodeURIComponent(key)}/${encodeURIComponent(value)}/ex/${exSeconds}`
+    : `${UPSTASH_URL}/set/${encodeURIComponent(key)}/${encodeURIComponent(value)}`;
+  await fetch(url, {
     headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` }
   });
 }
