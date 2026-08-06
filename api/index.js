@@ -1,9 +1,11 @@
-const BOT_TOKEN   = "8284872523:AAHgec_-A5fRZHHQErJDHw4c0OAhmFOjhcs";
-const ADMIN_ID    = 8341909387;
-const GROUP_1     = -1003837168073;
-const GROUP_2     = -1003757012314;
-const BACKOFFICE  = -1003681110338;
-const SHEET_URL   = "https://script.google.com/macros/s/AKfycbzHElP69tfzGCuJw6fASflv9DL8fd_bYDOchS32HpPoCg2H9vAPCAjyjr0cTIImLEyI/exec";
+const BOT_TOKEN  = "8284872523:AAHgec_-A5fRZHHQErJDHw4c0OAhmFOjhcs";
+const ADMIN_ID   = 8341909387;
+const GROUP_1    = -1003837168073;
+const GROUP_2    = -1003757012314;
+const BACKOFFICE = -1003681110338;
+
+const UPSTASH_URL   = "https://crack-minnow-180173.upstash.io";
+const UPSTASH_TOKEN = "gQAAAAAAAr_NAAIgcDIxOGJjMTRhMGE2OTc0NmE0YjRkNTViMWYwNzM4ZjgxZg";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -121,10 +123,7 @@ async function validateOrder(msg) {
   if (invalid.length > 0) parts.push(invalid.join(" | "));
 
   if (parts.length > 0) {
-    const groupMsg = `⚠️ ${parts.join(" | ")}`;
-    await sendMessage(chatId, groupMsg, msgId);
-
-    // ── DM the poster ──────────────────────────────
+    await sendMessage(chatId, `⚠️ ${parts.join(" | ")}`, msgId);
     const dmMsg =
       `⚠️ Issue with your order\n\n` +
       `Customer: ${name || "—"}\n` +
@@ -140,40 +139,58 @@ async function validateOrder(msg) {
 
   // ── Duplicate contact check (skip if returning) ────
   if (contact && name && !isReturning) {
-    const raw      = contact.replace(/\[([^\]]+)\]\(tel:[^\)]+\)/g, "$1")
-                            .replace(/[\s\-\(\)]/g, "");
+    const raw = contact
+      .replace(/\[([^\]]+)\]\(tel:[^\)]+\)/g, "$1")
+      .replace(/[\s\-\(\)]/g, "");
     const stripped = raw.startsWith("+233") ? "0" + raw.substring(4)
                    : raw.startsWith("233")  ? "0" + raw.substring(3)
                    : raw;
 
     try {
-      const checkRes = await fetch(SHEET_URL, {
-  method: "POST",
-  headers: { "Content-Type": "application/x-www-form-urlencoded" },
-  body: `action=checkContact&contact=${encodeURIComponent(stripped)}&name=${encodeURIComponent(name)}`
-});
-const resultText = await checkRes.text();
-const result = JSON.parse(resultText);
+      // ── Check if contact was used recently ──────────
+      const existing = await redisGet(`contact:${stripped}`);
 
-if (result.found) {
-  const warning =
-    `⚠️ Contact ${stripped} was used ${result.daysAgo} day(s) ago ` +
-    `for a different customer (${result.name}) — please verify`;
-  await sendMessage(chatId, warning, msgId);
-}
+      if (existing) {
+        const data = JSON.parse(existing);
+        if (data.name.toLowerCase() !== name.trim().toLowerCase()) {
+          const daysAgo = Math.floor((Date.now() - data.timestamp) / (1000 * 60 * 60 * 24));
+          await sendMessage(
+            chatId,
+            `⚠️ Contact ${stripped} was used ${daysAgo} day(s) ago for a different customer (${data.name}) — please verify`,
+            msgId
+          );
+        }
+      }
 
-// ── Log this contact for future checks ─────────
-await fetch(SHEET_URL, {
-  method: "POST",
-  headers: { "Content-Type": "application/x-www-form-urlencoded" },
-  body: `action=logContact&contact=${encodeURIComponent(stripped)}&name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}`
-});
+      // ── Log contact with 3-day expiry ────────────────
+      await redisSet(
+        `contact:${stripped}`,
+        JSON.stringify({ name: name.trim(), timestamp: Date.now() }),
+        3 * 24 * 60 * 60 // 3 days in seconds
+      );
+
     } catch(e) {
-      console.error("Sheet check error:", e);
+      console.error("Redis error:", e);
     }
   }
 }
 
+// ─── Upstash Redis helpers ─────────────────────────────
+async function redisGet(key) {
+  const res = await fetch(`${UPSTASH_URL}/get/${encodeURIComponent(key)}`, {
+    headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` }
+  });
+  const data = await res.json();
+  return data.result;
+}
+
+async function redisSet(key, value, exSeconds) {
+  await fetch(`${UPSTASH_URL}/set/${encodeURIComponent(key)}/${encodeURIComponent(value)}/ex/${exSeconds}`, {
+    headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` }
+  });
+}
+
+// ─── Extract field ─────────────────────────────────────
 function extractField(text, pattern) {
   const cleaned = text.replace(/\[([^\]]+)\]\(tel:[^\)]+\)/g, "$1");
   const re = new RegExp(
@@ -182,13 +199,10 @@ function extractField(text, pattern) {
   return (cleaned.match(re) || [])[1]?.trim() || "";
 }
 
+// ─── Send Telegram message ─────────────────────────────
 async function sendMessage(chatId, text, replyToId) {
-  const payload = {
-    chat_id: chatId,
-    text:    text
-  };
+  const payload = { chat_id: chatId, text };
   if (replyToId) payload.reply_to_message_id = replyToId;
-
   await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
