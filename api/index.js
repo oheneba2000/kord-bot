@@ -147,22 +147,27 @@ async function validateOrder(msg) {
                    : raw;
 
     try {
-      const checkRes = await fetch(
-        `${SHEET_URL}?action=checkContact&contact=${encodeURIComponent(stripped)}&name=${encodeURIComponent(name)}`
-      );
-      const result = await checkRes.json();
+      const checkRes = await fetch(SHEET_URL, {
+  method: "POST",
+  headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  body: `action=checkContact&contact=${encodeURIComponent(stripped)}&name=${encodeURIComponent(name)}`
+});
+const resultText = await checkRes.text();
+const result = JSON.parse(resultText);
 
-      if (result.found) {
-        const warning =
-          `⚠️ Contact ${stripped} was used ${result.daysAgo} day(s) ago ` +
-          `for a different customer (${result.name}) — please verify`;
-        await sendMessage(chatId, warning, msgId);
-      }
+if (result.found) {
+  const warning =
+    `⚠️ Contact ${stripped} was used ${result.daysAgo} day(s) ago ` +
+    `for a different customer (${result.name}) — please verify`;
+  await sendMessage(chatId, warning, msgId);
+}
 
-      // ── Log this contact for future checks ─────────
-      await fetch(
-        `${SHEET_URL}?action=logContact&contact=${encodeURIComponent(stripped)}&name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}`
-      );
+// ── Log this contact for future checks ─────────
+await fetch(SHEET_URL, {
+  method: "POST",
+  headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  body: `action=logContact&contact=${encodeURIComponent(stripped)}&name=${encodeURIComponent(name)}&date=${encodeURIComponent(date)}`
+});
     } catch(e) {
       console.error("Sheet check error:", e);
     }
