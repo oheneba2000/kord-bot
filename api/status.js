@@ -1,31 +1,64 @@
-const SHEET_ID       = "1W7AVhwpkDVuHn1It5-QJmgnZRksXp002tEPIktOep_w";
-const CLIENT_EMAIL   = "kord-sheets@kord-bot.iam.gserviceaccount.com";
-const PRIVATE_KEY    = "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCt0fNeeUiPCbW3\nnT2bszJD4kbTaczt6Er6eD8x4LYzdXKCY1bddJe5agJT2NwCJzMrjffjD5r7tCe4\nOO1xNNpCPyMdHXl6idY7qTGynOxw/ZJmhnG7W4OEby5ytbfx3Vm05Nf2cm71z1E9\nZ94F5+ttZjuIT8T0WGQ08tyPpJLbc82iCfjP9Y2MLpHA146SPNQRcGIBzPxqXwzW\n5aeAWyomAJV25XByIMkjWd8L3JKymDDIiu8sxbssNLGUamcOWjzcuAdUPmmzMsGI\nmxekGRNyMBECfs4U4YBJS0NVQlCb/bi9AzYfsiE42rW+LPpZoQ7o3MrAJE1eRReX\nl5Xxhj5xAgMBAAECggEAFSxA194wL3RAVVhq+79NPSWf+PqnQseL8oyZLgswRn5k\n72sIVrtwC97U37/HtN9vhTuq2Va6SzS7rd4JVkPY3j7wmQhRFtMZbHUEn7wrtOu+\nXIy959OS5pvgbYqjGGwdFELX56Yyy/Bv9enkCpYggFf2onkNBbKKqkR3B2xFk0OJ\ngcQngAgTJEes2KZ8T4dchppx8LAIVhQWkGSc1o29/eWv0YbuwjytGNUUm7KTcv4k\nGx5pSjc5nywGAh9QVmDAdf6iFm59WeSngd8FBDt8b23h0U47Fs/x7mHxCwBoT37T\n4DSY/bzuGNm6LH67o2ib9wqhXQsq4RsOBuFUFNRf3QKBgQDTDkBZprHQ25hdQmW2\nsJeOmX+1VaoONhJj4iF3HrMpXAT2pc4q8ItyFXJcDFH1/d88ZoKT1h4FrJlxTi2p\nGYvPlBvE6WwaXFsd412dMsFID3sYcgABOYp8ig6DYrsUZ2+H1wq9TjvyFQoN8LVN\nEdYCD0CCWI3of/wMljPz/b107wKBgQDS1ctw6bgbV/TNUfzT78QegcEA+a2Xphh/\nH7Mvem0j+rRn+S8e/KWetdbrGTjdoC4Qd1+Z4iKRN3bpfkg1Kdgd2+V356TwwgvE\n6lSBvwcnXBc4Rx8xQsIx0YUtlxZo0LDYQsrtysMOiJxiNSWUAZaK685cO7ODrVHC\n4uGIjJtCnwKBgH3YAIy0NVBor5fj8EwXTbcMVbalBooEucBu5C9n0cI2iQscYCsA\nVNVIbnDuM6yunH4iTXei8zHE8ZU63UT344J5OHmYCQpKyVWv7XC/A7pY6LfxuYkB\na07I7tBufUg0SK9BjLjFvj6hRuZ7AU+b8/Q0be2KqcrZDUvf/8hbIq1nAoGAbaZL\nG/oxiecAphfRydeUw9jvq7YulgQIEXVHF5YwVNn6IWjzHMaAzD39/F8tt/Wqf13W\nFo4JNEUITv8iRqPwhfbrLKUInz4MKOlF8gSLj+jRGq/ChTgXDxnMjZ1aRkDi+FYk\ne+9L6q8ZxemmFYeN58ojlMxn3D+zmgutB/s4dDkCgYAep1qsHX8txnUKuWcCScIj\nA4n4uK3/wXzjOGno5vJfv4x+0iVZSNJAqIaLdX77z2zRiCvc9RgyRtHf0V5o3oK+\n9W9m/gDthMzynWRqc1bwoky5Tj4HClWXk/SQ4zpX7ZkWjfCL2mcqGj5Ku5L4qClt\nWixFmPigd+4HuxF4K4lhqg==\n-----END PRIVATE KEY-----\n";
-const APP_PASSWORD   = "0249";
+const SHEET_ID     = "1W7AVhwpkDVuHn1It5-QJmgnZRksXp002tEPIktOep_w";
+const CLIENT_EMAIL = "kord-sheets@kord-bot.iam.gserviceaccount.com";
+const PRIVATE_KEY  = "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCt0fNeeUiPCbW3\nnT2bszJD4kbTaczt6Er6eD8x4LYzdXKCY1bddJe5agJT2NwCJzMrjffjD5r7tCe4\nOO1xNNpCPyMdHXl6idY7qTGynOxw/ZJmhnG7W4OEby5ytbfx3Vm05Nf2cm71z1E9\nZ94F5+ttZjuIT8T0WGQ08tyPpJLbc82iCfjP9Y2MLpHA146SPNQRcGIBzPxqXwzW\n5aeAWyomAJV25XByIMkjWd8L3JKymDDIiu8sxbssNLGUamcOWjzcuAdUPmmzMsGI\nmxekGRNyMBECfs4U4YBJS0NVQlCb/bi9AzYfsiE42rW+LPpZoQ7o3MrAJE1eRReX\nl5Xxhj5xAgMBAAECggEAFSxA194wL3RAVVhq+79NPSWf+PqnQseL8oyZLgswRn5k\n72sIVrtwC97U37/HtN9vhTuq2Va6SzS7rd4JVkPY3j7wmQhRFtMZbHUEn7wrtOu+\nXIy959OS5pvgbYqjGGwdFELX56Yyy/Bv9enkCpYggFf2onkNBbKKqkR3B2xFk0OJ\ngcQngAgTJEes2KZ8T4dchppx8LAIVhQWkGSc1o29/eWv0YbuwjytGNUUm7KTcv4k\nGx5pSjc5nywGAh9QVmDAdf6iFm59WeSngd8FBDt8b23h0U47Fs/x7mHxCwBoT37T\n4DSY/bzuGNm6LH67o2ib9wqhXQsq4RsOBuFUFNRf3QKBgQDTDkBZprHQ25hdQmW2\nsJeOmX+1VaoONhJj4iF3HrMpXAT2pc4q8ItyFXJcDFH1/d88ZoKT1h4FrJlxTi2p\nGYvPlBvE6WwaXFsd412dMsFID3sYcgABOYp8ig6DYrsUZ2+H1wq9TjvyFQoN8LVN\nEdYCD0CCWI3of/wMljPz/b107wKBgQDS1ctw6bgbV/TNUfzT78QegcEA+a2Xphh/\nH7Mvem0j+rRn+S8e/KWetdbrGTjdoC4Qd1+Z4iKRN3bpfkg1Kdgd2+V356TwwgvE\n6lSBvwcnXBc4Rx8xQsIx0YUtlxZo0LDYQsrtysMOiJxiNSWUAZaK685cO7ODrVHC\n4uGIjJtCnwKBgH3YAIy0NVBor5fj8EwXTbcMVbalBooEucBu5C9n0cI2iQscYCsA\nVNVIbnDuM6yunH4iTXei8zHE8ZU63UT344J5OHmYCQpKyVWv7XC/A7pY6LfxuYkB\na07I7tBufUg0SK9BjLjFvj6hRuZ7AU+b8/Q0be2KqcrZDUvf/8hbIq1nAoGAbaZL\nG/oxiecAphfRydeUw9jvq7YulgQIEXVHF5YwVNn6IWjzHMaAzD39/F8tt/Wqf13W\nFo4JNEUITv8iRqPwhfbrLKUInz4MKOlF8gSLj+jRGq/ChTgXDxnMjZ1aRkDi+FYk\ne+9L6q8ZxemmFYeN58ojlMxn3D+zmgutB/s4dDkCgYAep1qsHX8txnUKuWcCScIj\nA4n4uK3/wXzjOGno5vJfv4x+0iVZSNJAqIaLdX77z2zRiCvc9RgyRtHf0V5o3oK+\n9W9m/gDthMzynWRqc1bwoky5Tj4HClWXk/SQ4zpX7ZkWjfCL2mcqGj5Ku5L4qClt\nWixFmPigd+4HuxF4K4lhqg==\n-----END PRIVATE KEY-----\n";
+const APP_PASSWORD = "0249";
 
-const COURIERS = [
-  "Prince","Embeunice","Innocent","Mathew","Takoradi","Tarkwa",
-  "Christopher","Adu","Charles","Ernest","Richard","Abdul","AT",
-  "Gertrude","Amos","Jesse","Michael","Cape Coast","Foster","Paul",
-  "Vimax","Eric","Padmore"
-];
+export default async function handler(req, res) {
+  const url    = new URL(req.url, `https://${req.headers.host}`);
+  const action = url.searchParams.get("action") || "";
+  const pw     = url.searchParams.get("pw")     || "";
+  const sheet  = url.searchParams.get("sheet")  || "ORDERS";
 
-// ─── Auth token for Google Sheets API ─────────────────
+  if (req.method === "GET" && !action) {
+    res.setHeader("Content-Type", "text/html");
+    return res.status(200).send(getHTML());
+  }
+
+  if (pw !== APP_PASSWORD) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const token = await getAccessToken();
+
+    if (action === "getOrders") {
+      const orders = await getTodayOrders(token, sheet);
+      return res.status(200).json(orders);
+    }
+
+    if (action === "updateRow") {
+      const row             = parseInt(url.searchParams.get("row"));
+      const status          = url.searchParams.get("status")          || "";
+      const courier         = url.searchParams.get("courier")         || "";
+      const customerPayment = url.searchParams.get("customerPayment") || "";
+      const riderPayment    = url.searchParams.get("riderPayment")    || "";
+      await updateSheetRow(token, sheet, row, status, courier, customerPayment, riderPayment);
+      return res.status(200).json({ ok: true });
+    }
+
+    return res.status(400).json({ error: "Unknown action" });
+
+  } catch (err) {
+    console.error("Error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+}
+
 async function getAccessToken() {
-  const now  = Math.floor(Date.now() / 1000);
+  const now = Math.floor(Date.now() / 1000);
   const claim = {
-    iss: CLIENT_EMAIL,
+    iss:   CLIENT_EMAIL,
     scope: "https://www.googleapis.com/auth/spreadsheets",
-    aud: "https://oauth2.googleapis.com/token",
-    exp: now + 3600,
-    iat: now
+    aud:   "https://oauth2.googleapis.com/token",
+    exp:   now + 3600,
+    iat:   now
   };
 
-  const header  = btoa(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  const payload = btoa(JSON.stringify(claim));
+  const header  = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const payload = base64url(JSON.stringify(claim));
   const input   = `${header}.${payload}`;
 
-  const keyData = PRIVATE_KEY.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g, "");
+  const keyData   = PRIVATE_KEY.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g, "");
   const binaryKey = Uint8Array.from(atob(keyData), c => c.charCodeAt(0));
 
   const cryptoKey = await crypto.subtle.importKey(
@@ -39,19 +72,25 @@ async function getAccessToken() {
     new TextEncoder().encode(input)
   );
 
-  const sig = btoa(String.fromCharCode(...new Uint8Array(signature)));
+  const sig = base64url(String.fromCharCode(...new Uint8Array(signature)));
   const jwt = `${input}.${sig}`;
 
-  const res  = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method:  "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
+    body:    `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
   });
   const data = await res.json();
   return data.access_token;
 }
 
-// ─── Read sheet rows ───────────────────────────────────
+function base64url(str) {
+  const b64 = typeof str === "string"
+    ? btoa(unescape(encodeURIComponent(str)))
+    : btoa(str);
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+}
+
 async function getSheetRows(token, sheetName, range) {
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(sheetName + "!" + range)}`;
   const res = await fetch(url, {
@@ -61,43 +100,34 @@ async function getSheetRows(token, sheetName, range) {
   return data.values || [];
 }
 
-// ─── Update sheet row ──────────────────────────────────
 async function updateSheetRow(token, sheetName, rowNum, status, courier, customerPayment, riderPayment) {
   const range  = `${sheetName}!E${rowNum}:H${rowNum}`;
   const values = [[status, courier, customerPayment, riderPayment]];
-  await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`, {
-    method:  "PUT",
-    headers: {
-      Authorization:  `Bearer ${token}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ range, majorDimension: "ROWS", values })
-  });
+  await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
+    {
+      method:  "PUT",
+      headers: {
+        Authorization:  `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ range, majorDimension: "ROWS", values })
+    }
+  );
 }
 
-// ─── Get today's orders ────────────────────────────────
 async function getTodayOrders(token, sheetName) {
   const headerRow = sheetName === "MODS" ? 4 : 7;
   const rows      = await getSheetRows(token, sheetName, `A${headerRow}:N1000`);
-  const today     = new Date();
-  const today     = new Date();
-  const mm        = String(today.getMonth() + 1);
-  const dd        = String(today.getDate());
-  const yyyy      = String(today.getFullYear());
-  const todayStr  = `${mm}/${dd}/${yyyy}`.toLowerCase();
 
-  async function getTodayOrders(token, sheetName) {
-  const headerRow = sheetName === "MODS" ? 4 : 7;
-  const rows      = await getSheetRows(token, sheetName, `A${headerRow}:N1000`);
-
-  const now   = new Date();
-  const mm    = String(now.getMonth() + 1);
-  const dd    = String(now.getDate());
-  const yyyy  = String(now.getFullYear());
-  const todayStr = `${mm}/${dd}/${yyyy}`;
+  const now      = new Date();
+  const mm       = String(now.getMonth() + 1);
+  const dd       = String(now.getDate());
+  const yyyy     = String(now.getFullYear());
+  const todayStr = mm + "/" + dd + "/" + yyyy;
 
   const orders = [];
-  rows.forEach((row, idx) => {
+  rows.forEach(function(row, idx) {
     if (!row[0]) return;
     const dateVal = String(row[0]).trim();
     if (dateVal !== todayStr) return;
@@ -120,53 +150,6 @@ async function getTodayOrders(token, sheetName) {
   return orders;
 }
 
-// ─── Main handler ──────────────────────────────────────
-export default async function handler(req, res) {
-  const url    = new URL(req.url, `https://${req.headers.host}`);
-  const action = url.searchParams.get("action") || "";
-  const pw     = url.searchParams.get("pw")     || "";
-  const sheet  = url.searchParams.get("sheet")  || "ORDERS";
-
-  // ── Serve HTML page ────────────────────────────────
-  if (req.method === "GET" && !action) {
-    res.setHeader("Content-Type", "text/html");
-    return res.status(200).send(getHTML());
-  }
-
-  // ── Auth check ─────────────────────────────────────
-  if (pw !== APP_PASSWORD) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
-  try {
-    const token = await getAccessToken();
-
-    // ── Get orders ──────────────────────────────────
-    if (action === "getOrders") {
-      const orders = await getTodayOrders(token, sheet);
-      return res.status(200).json(orders);
-    }
-
-    // ── Update row ──────────────────────────────────
-    if (action === "updateRow") {
-      const row             = parseInt(url.searchParams.get("row"));
-      const status          = url.searchParams.get("status")          || "";
-      const courier         = url.searchParams.get("courier")         || "";
-      const customerPayment = url.searchParams.get("customerPayment") || "";
-      const riderPayment    = url.searchParams.get("riderPayment")    || "";
-      await updateSheetRow(token, sheet, row, status, courier, customerPayment, riderPayment);
-      return res.status(200).json({ ok: true });
-    }
-
-    return res.status(400).json({ error: "Unknown action" });
-
-  } catch (err) {
-    console.error("Status app error:", err);
-    return res.status(500).json({ error: err.message });
-  }
-}
-
-// ─── HTML page ─────────────────────────────────────────
 function getHTML() {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -291,15 +274,15 @@ function getHTML() {
 </div>
 
 <script>
-  const BASE = window.location.origin + "/api/status";
+  const BASE = window.location.href.split('?')[0];
   let pw = "", currentTab = "ORDERS", currentRow = null;
   let allOrders = { ORDERS: [], MODS: [] };
 
   function login() {
     pw = document.getElementById("pwInput").value.trim();
     fetch(BASE + "?action=getOrders&sheet=ORDERS&pw=" + pw)
-      .then(r => r.json())
-      .then(data => {
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
         if (data.error) {
           document.getElementById("loginError").style.display = "block";
           return;
@@ -316,8 +299,8 @@ function getHTML() {
 
   function loadTab(sheet) {
     fetch(BASE + "?action=getOrders&sheet=" + sheet + "&pw=" + pw)
-      .then(r => r.json())
-      .then(data => {
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
         allOrders[sheet] = data;
         document.getElementById(sheet === "ORDERS" ? "ordersCount" : "modsCount").textContent = data.length;
         if (sheet === currentTab) renderOrders();
@@ -331,48 +314,48 @@ function getHTML() {
   }
 
   function setDateLabel() {
-    const t = new Date();
+    var t = new Date();
     document.getElementById("dateLabel").textContent =
       t.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
   }
 
   function switchTab(tab, el) {
     currentTab = tab;
-    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".tab").forEach(function(t) { t.classList.remove("active"); });
     el.classList.add("active");
     renderOrders();
   }
 
   function renderOrders() {
-    const orders = allOrders[currentTab] || [];
-    const list   = document.getElementById("orderList");
+    var orders = allOrders[currentTab] || [];
+    var list   = document.getElementById("orderList");
     document.getElementById("orderCount").textContent = orders.length + " order(s) today";
     if (!orders.length) {
       list.innerHTML = '<div class="empty">No orders for today</div>';
       return;
     }
-    list.innerHTML = orders.map((o, idx) => {
-      const sc = o.status.toLowerCase().includes("deliver") ? "delivered"
-               : o.status.toLowerCase() === "reconfirm"    ? "reconfirm"
-               : o.status.toLowerCase() === "cancelled"     ? "cancelled"
-               : o.status.toLowerCase() === "rescheduled"   ? "rescheduled" : "";
-      return \`<div class="order-card \${o._updated ? "updated" : ""}">
-        <div class="order-name">\${o.customer}</div>
-        <div class="order-meta">
-          📍 \${o.location}<br>
-          📞 \${o.contact}<br>
-          📦 \${o.product} x\${o.qty} — \${o.price}<br>
-          🧑‍💼 \${o.operator}\${o.courier ? " | 🚗 " + o.courier : ""}
-        </div>
-        \${o.status ? \`<div class="order-status \${sc}">\${o.status}\${o.customerPayment ? " · " + o.customerPayment : ""}</div>\` : ""}
-        <button class="update-btn" onclick="openModal(\${idx})">Update</button>
-      </div>\`;
+    list.innerHTML = orders.map(function(o, idx) {
+      var sc = o.status.toLowerCase().indexOf("deliver") >= 0 ? "delivered"
+             : o.status.toLowerCase() === "reconfirm"         ? "reconfirm"
+             : o.status.toLowerCase() === "cancelled"          ? "cancelled"
+             : o.status.toLowerCase() === "rescheduled"        ? "rescheduled" : "";
+      return '<div class="order-card ' + (o._updated ? "updated" : "") + '">' +
+        '<div class="order-name">' + o.customer + '</div>' +
+        '<div class="order-meta">' +
+          '📍 ' + o.location + '<br>' +
+          '📞 ' + o.contact + '<br>' +
+          '📦 ' + o.product + ' x' + o.qty + ' — ' + o.price + '<br>' +
+          '🧑‍💼 ' + o.operator + (o.courier ? ' | 🚗 ' + o.courier : '') +
+        '</div>' +
+        (o.status ? '<div class="order-status ' + sc + '">' + o.status + (o.customerPayment ? ' · ' + o.customerPayment : '') + '</div>' : '') +
+        '<button class="update-btn" onclick="openModal(' + idx + ')">Update</button>' +
+      '</div>';
     }).join("");
   }
 
   function openModal(idx) {
-    const o = allOrders[currentTab][idx];
-    currentRow = { row: o.row, idx };
+    var o = allOrders[currentTab][idx];
+    currentRow = { row: o.row, idx: idx };
     document.getElementById("modalTitle").textContent   = o.customer;
     document.getElementById("selStatus").value          = o.status          || "";
     document.getElementById("selCourier").value         = o.courier         || "";
@@ -388,24 +371,26 @@ function getHTML() {
 
   function saveUpdate() {
     if (!currentRow) return;
-    const btn             = document.getElementById("saveBtn");
-    const status          = document.getElementById("selStatus").value;
-    const courier         = document.getElementById("selCourier").value;
-    const customerPayment = document.getElementById("selCustomerPay").value;
-    const riderPayment    = document.getElementById("selRiderPay").value;
+    var btn             = document.getElementById("saveBtn");
+    var status          = document.getElementById("selStatus").value;
+    var courier         = document.getElementById("selCourier").value;
+    var customerPayment = document.getElementById("selCustomerPay").value;
+    var riderPayment    = document.getElementById("selRiderPay").value;
 
     btn.textContent = "Saving...";
     btn.disabled    = true;
 
-    const params = new URLSearchParams({
-      action: "updateRow", sheet: currentTab, pw,
-      row: currentRow.row, status, courier, customerPayment, riderPayment
-    });
+    var params = "action=updateRow&sheet=" + currentTab + "&pw=" + pw +
+      "&row=" + currentRow.row +
+      "&status=" + encodeURIComponent(status) +
+      "&courier=" + encodeURIComponent(courier) +
+      "&customerPayment=" + encodeURIComponent(customerPayment) +
+      "&riderPayment=" + encodeURIComponent(riderPayment);
 
-    fetch(BASE + "?" + params.toString())
-      .then(r => r.json())
-      .then(() => {
-        const o = allOrders[currentTab][currentRow.idx];
+    fetch(BASE + "?" + params)
+      .then(function(r) { return r.json(); })
+      .then(function() {
+        var o = allOrders[currentTab][currentRow.idx];
         if (status)          o.status          = status;
         if (courier)         o.courier         = courier;
         if (customerPayment) o.customerPayment = customerPayment;
@@ -416,13 +401,13 @@ function getHTML() {
         closeModal();
         renderOrders();
       })
-      .catch(() => {
+      .catch(function() {
         btn.textContent = "Save";
         btn.disabled    = false;
       });
   }
 
-  document.getElementById("pwInput").addEventListener("keydown", e => {
+  document.getElementById("pwInput").addEventListener("keydown", function(e) {
     if (e.key === "Enter") login();
   });
 </script>
