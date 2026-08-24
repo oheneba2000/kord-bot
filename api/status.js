@@ -80,9 +80,11 @@ async function getTodayOrders(token, sheetName) {
   const headerRow = sheetName === "MODS" ? 4 : 7;
   const rows      = await getSheetRows(token, sheetName, `A${headerRow}:N1000`);
   const today     = new Date();
+  const today     = new Date();
+  const mm        = String(today.getMonth() + 1);
   const dd        = String(today.getDate());
-  const mmm       = today.toLocaleString("en-GB", { month: "short" });
-  const todayStr  = `${dd}-${mmm}`.toLowerCase();
+  const yyyy      = String(today.getFullYear());
+  const todayStr  = `${mm}/${dd}/${yyyy}`.toLowerCase();
 
   const orders = [];
   rows.forEach((row, idx) => {
