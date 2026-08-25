@@ -27,6 +27,11 @@ export default async function handler(req, res) {
       return res.status(200).json(orders);
     }
 
+    if (action === "debug") {
+      const rows = await getSheetRows(token, sheet, "A7:A20");
+      return res.status(200).json({ rows, date: url.searchParams.get("date") });
+    }
+
     if (action === "updateRow") {
       const row             = parseInt(url.searchParams.get("row"));
       const status          = url.searchParams.get("status")          || "";
