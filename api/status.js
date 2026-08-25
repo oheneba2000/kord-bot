@@ -135,7 +135,7 @@ async function updateSheetRow(token, sheetName, rowNum, status, courier, custome
 
 async function getTodayOrders(token, sheetName) {
   const headerRow = sheetName === "MODS" ? 4 : 7;
-  const rows = await getSheetRows(token, sheetName, `A${headerRow}:N4000`);
+  const rows = await getSheetRows(token, sheetName, `A${headerRow}:N`);
 
   const now     = new Date();
   const dd      = String(now.getDate());
