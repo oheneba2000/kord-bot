@@ -149,7 +149,7 @@ async function getTodayOrders(token, sheetName) {
     const dateVal = String(row[0]).trim();
     if (dateVal !== todayStr) return;
     orders.push({
-      row:             headerRow + idx,
+      row: headerRow + idx + 1,
       date:            row[0]  || "",
       customer:        row[1]  || "",
       location:        row[2]  || "",
