@@ -23,8 +23,9 @@ export default async function handler(req, res) {
 
     if (action === "getOrders") {
       const dateStr = url.searchParams.get("date") || "";
+      const rows    = await getSheetRows(token, sheet, "A3050:A3060");
       const orders  = await getTodayOrders(token, sheet, dateStr);
-      return res.status(200).json(orders);
+      return res.status(200).json({ orders, sampleDates: rows, dateStr });
     }
 
     if (action === "updateRow") {
