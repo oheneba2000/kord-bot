@@ -4,7 +4,7 @@ const PRIVATE_KEY  = "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFA
 const APP_PASSWORD = "0249";
 
 export default async function handler(req, res) {
-  const url    = new URL(req.url, `https://${req.headers.host}`);
+  const url    = new URL(req.url, "https://" + req.headers.host);
   const action = url.searchParams.get("action") || "";
   const pw     = url.searchParams.get("pw")     || "";
   const sheet  = url.searchParams.get("sheet")  || "ORDERS";
@@ -22,8 +22,9 @@ export default async function handler(req, res) {
     const token = await getAccessToken();
 
     if (action === "getOrders") {
-      const orders = await getTodayOrders(token, sheet);
-      return res.status(200).json(orders);
+      const orders    = await getTodayOrders(token, sheet);
+      const dashboard = await getDashboard(token);
+      return res.status(200).json({ orders, dashboard });
     }
 
     if (action === "updateRow") {
@@ -32,9 +33,11 @@ export default async function handler(req, res) {
       const courier         = url.searchParams.get("courier")         || "";
       const customerPayment = url.searchParams.get("customerPayment") || "";
       const riderPayment    = url.searchParams.get("riderPayment")    || "";
-      const result = await updateSheetRow(token, sheet, row, status, courier, customerPayment, riderPayment);
+      const comment         = url.searchParams.get("comment")         || "";
+      const result = await updateSheetRow(token, sheet, row, status, courier, customerPayment, riderPayment, comment);
       return res.status(200).json({ ok: true, result });
     }
+
     return res.status(400).json({ error: "Unknown action" });
 
   } catch (err) {
@@ -66,82 +69,91 @@ async function getAccessToken() {
   const binaryKey = Uint8Array.from(atob(keyData), function(c) { return c.charCodeAt(0); });
 
   const cryptoKey = await crypto.subtle.importKey(
-    "pkcs8",
-    binaryKey.buffer,
+    "pkcs8", binaryKey.buffer,
     { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["sign"]
+    false, ["sign"]
   );
 
-  const encoder   = new TextEncoder();
   const signature = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5",
-    cryptoKey,
-    encoder.encode(input)
+    "RSASSA-PKCS1-v1_5", cryptoKey,
+    new TextEncoder().encode(input)
   );
 
-  const sigBytes = new Uint8Array(signature);
-  let sigStr = "";
-  sigBytes.forEach(function(b) { sigStr += String.fromCharCode(b); });
-  const sig = toBase64Url(sigStr, true);
-
-  const jwt = input + "." + sig;
+  var sigStr = "";
+  new Uint8Array(signature).forEach(function(b) { sigStr += String.fromCharCode(b); });
+  const jwt = input + "." + toBase64Url(sigStr, true);
 
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method:  "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body:    "grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=" + jwt
   });
-
   const data = await res.json();
   return data.access_token;
 }
 
 function toBase64Url(str, isBinary) {
-  var b64;
-  if (isBinary) {
-    b64 = btoa(str);
-  } else {
-    b64 = btoa(unescape(encodeURIComponent(str)));
-  }
+  var b64 = isBinary ? btoa(str) : btoa(unescape(encodeURIComponent(str)));
   return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
 async function getSheetRows(token, sheetName, range) {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(sheetName + "!" + range)}`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+  const url  = "https://sheets.googleapis.com/v4/spreadsheets/" + SHEET_ID + "/values/" + encodeURIComponent(sheetName + "!" + range);
+  const res  = await fetch(url, { headers: { Authorization: "Bearer " + token } });
   const data = await res.json();
   return data.values || [];
 }
 
-async function updateSheetRow(token, sheetName, rowNum, status, courier, customerPayment, riderPayment) {
-  const range  = `${sheetName}!E${rowNum}:H${rowNum}`;
-  const values = [[status, courier, customerPayment, riderPayment]];
+async function getDashboard(token) {
+  const rows = await getSheetRows(token, "ORDERS", "B3:F3");
+  if (!rows.length) return {};
+  const r = rows[0];
+  return {
+    todayOrders:   r[0] || "0",
+    onDelivery:    r[1] || "0",
+    deliveredToday: r[2] || "0"
+  };
+}
+
+async function updateSheetRow(token, sheetName, rowNum, status, courier, customerPayment, riderPayment, comment) {
+  const commentCol = sheetName === "MODS" ? "O" : "O";
+  const range      = sheetName + "!E" + rowNum + ":H" + rowNum;
+  const values     = [[status, courier, customerPayment, riderPayment]];
+
   const res = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
+    "https://sheets.googleapis.com/v4/spreadsheets/" + SHEET_ID + "/values/" + encodeURIComponent(range) + "?valueInputOption=USER_ENTERED",
     {
       method:  "PUT",
-      headers: {
-        Authorization:  `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ range, majorDimension: "ROWS", values })
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+      body:    JSON.stringify({ range, majorDimension: "ROWS", values })
     }
   );
   const data = await res.json();
-  console.log("Update response:", JSON.stringify(data));
+
+  if (comment) {
+    const commentRange  = sheetName + "!" + commentCol + rowNum;
+    const commentValues = [[comment]];
+    await fetch(
+      "https://sheets.googleapis.com/v4/spreadsheets/" + SHEET_ID + "/values/" + encodeURIComponent(commentRange) + "?valueInputOption=USER_ENTERED",
+      {
+        method:  "PUT",
+        headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+        body:    JSON.stringify({ range: commentRange, majorDimension: "ROWS", values: commentValues })
+      }
+    );
+  }
+
   return data;
 }
+
 async function getTodayOrders(token, sheetName) {
   const headerRow = sheetName === "MODS" ? 4 : 7;
-  const rows = await getSheetRows(token, sheetName, `A${headerRow}:N`);
+  const rows      = await getSheetRows(token, sheetName, "A" + headerRow + ":O");
 
-  const now     = new Date();
-  const dd      = String(now.getDate());
-  const months  = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const mmm     = months[now.getMonth()];
+  const now      = new Date();
+  const dd       = String(now.getDate());
+  const months   = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const mmm      = months[now.getMonth()];
   const todayStr = dd + "-" + mmm;
 
   const orders = [];
@@ -150,7 +162,7 @@ async function getTodayOrders(token, sheetName) {
     const dateVal = String(row[0]).trim();
     if (dateVal !== todayStr) return;
     orders.push({
-      row: headerRow + idx,
+      row:             headerRow + idx,
       date:            row[0]  || "",
       customer:        row[1]  || "",
       location:        row[2]  || "",
@@ -162,7 +174,8 @@ async function getTodayOrders(token, sheetName) {
       product:         row[9]  || "",
       qty:             row[10] || "",
       price:           row[11] || "",
-      operator:        row[12] || ""
+      operator:        row[12] || "",
+      comment:         row[14] || ""
     });
   });
   return orders;
@@ -178,44 +191,55 @@ function getHTML() {
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f0f0; color: #222; }
-    .header { background: #8B0000; color: white; padding: 16px 20px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
-    .header h1 { font-size: 18px; font-weight: 700; }
-    .header p { font-size: 12px; opacity: 0.8; margin-top: 2px; }
-    .tab-bar { display: flex; background: #6b0000; }
+    .header { background: #8B0000; color: white; padding: 14px 20px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+    .header h1 { font-size: 17px; font-weight: 700; }
+    .header p  { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+    .dashboard { display: flex; gap: 8px; padding: 10px 12px; background: #6b0000; }
+    .dash-card { flex: 1; background: rgba(255,255,255,0.15); border-radius: 8px; padding: 8px; text-align: center; color: white; }
+    .dash-num  { font-size: 20px; font-weight: 700; }
+    .dash-lbl  { font-size: 10px; opacity: 0.8; margin-top: 2px; }
+    .tab-bar { display: flex; background: #550000; }
     .tab { flex: 1; padding: 10px; text-align: center; color: white; font-size: 13px; font-weight: 600; cursor: pointer; opacity: 0.6; border-bottom: 3px solid transparent; }
     .tab.active { opacity: 1; border-bottom-color: white; }
-    .content { padding: 12px; max-width: 640px; margin: 0 auto; }
-    .order-card { background: white; border-radius: 10px; padding: 14px; margin-bottom: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+    .search-wrap { padding: 10px 12px; background: white; border-bottom: 1px solid #eee; }
+    .search-input { width: 100%; padding: 9px 12px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 14px; }
+    .search-input:focus { border-color: #8B0000; outline: none; }
+    .content { padding: 10px 12px; max-width: 640px; margin: 0 auto; }
+    .order-card { background: white; border-radius: 10px; padding: 14px; margin-bottom: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.07); }
     .order-card.updated { border-left: 4px solid #2a7a2a; }
     .order-name { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
     .order-meta { font-size: 12px; color: #666; margin-bottom: 8px; line-height: 1.6; }
+    .order-comment { font-size: 11px; color: #8B0000; background: #fff5f5; padding: 4px 8px; border-radius: 6px; margin-bottom: 8px; }
     .order-status { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: #eee; color: #444; margin-bottom: 10px; }
-    .order-status.delivered { background: #d4edda; color: #155724; }
-    .order-status.reconfirm { background: #d6d6f5; color: #333; }
-    .order-status.cancelled { background: #f8d7da; color: #721c24; }
+    .order-status.delivered  { background: #d4edda; color: #155724; }
+    .order-status.reconfirm  { background: #d6d6f5; color: #333; }
+    .order-status.cancelled  { background: #f8d7da; color: #721c24; }
     .order-status.rescheduled { background: #fff3cd; color: #856404; }
+    .order-status.failed     { background: #f8d7da; color: #721c24; }
     .update-btn { width: 100%; padding: 10px; background: #8B0000; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; overflow-y: auto; }
     .modal-overlay.open { display: flex; align-items: flex-end; }
     .modal { background: white; width: 100%; max-width: 640px; margin: 0 auto; border-radius: 16px 16px 0 0; padding: 20px; max-height: 90vh; overflow-y: auto; }
-    .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; color: #8B0000; }
+    .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; color: #8B0000; }
+    .modal-sub { font-size: 12px; color: #888; margin-bottom: 16px; }
     .field-label { font-size: 12px; font-weight: 600; color: #555; margin-bottom: 6px; margin-top: 14px; }
-    select { width: 100%; padding: 10px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 14px; background: white; }
-    select:focus { border-color: #8B0000; outline: none; }
+    select, textarea { width: 100%; padding: 10px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 14px; background: white; font-family: inherit; }
+    select:focus, textarea:focus { border-color: #8B0000; outline: none; }
+    textarea { height: 80px; resize: vertical; }
     .modal-btns { display: flex; gap: 10px; margin-top: 20px; }
     .btn-save { flex: 1; padding: 12px; background: #8B0000; color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
     .btn-cancel { padding: 12px 20px; background: #f0f0f0; color: #444; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; }
     .login-wrap { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
     .login-card { background: white; border-radius: 14px; padding: 30px 24px; width: 100%; max-width: 360px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
     .login-logo { text-align: center; font-size: 36px; font-weight: 900; color: #8B0000; margin-bottom: 8px; }
-    .login-sub { text-align: center; font-size: 13px; color: #888; margin-bottom: 24px; }
+    .login-sub  { text-align: center; font-size: 13px; color: #888; margin-bottom: 24px; }
     .login-input { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 18px; text-align: center; letter-spacing: 8px; }
     .login-input:focus { border-color: #8B0000; outline: none; }
     .login-btn { width: 100%; padding: 13px; background: #8B0000; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; margin-top: 14px; cursor: pointer; }
     .login-error { color: #c00; font-size: 13px; text-align: center; margin-top: 10px; display: none; }
     .empty { text-align: center; padding: 40px 20px; color: #888; font-size: 14px; }
     .count-badge { font-size: 12px; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
-    .refresh-btn { background: none; border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; margin-top: 4px; }
+    .refresh-btn { background: none; border: 1px solid rgba(255,255,255,0.4); color: white; padding: 3px 8px; border-radius: 6px; font-size: 11px; cursor: pointer; margin-left: 8px; }
   </style>
 </head>
 <body>
@@ -232,13 +256,29 @@ function getHTML() {
 
 <div id="mainApp" style="display:none;">
   <div class="header">
-    <h1>KORD Status <span id="dateLabel"></span></h1>
+    <h1>KORD Status <span id="dateLabel"></span> <button class="refresh-btn" onclick="refreshOrders()">↻</button></h1>
     <p id="orderCount">Loading...</p>
-    <button class="refresh-btn" onclick="refreshOrders()">↻ Refresh</button>
+  </div>
+  <div class="dashboard">
+    <div class="dash-card">
+      <div class="dash-num" id="dashOrders">—</div>
+      <div class="dash-lbl">Today</div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-num" id="dashDelivery">—</div>
+      <div class="dash-lbl">On Delivery</div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-num" id="dashDelivered">—</div>
+      <div class="dash-lbl">Delivered</div>
+    </div>
   </div>
   <div class="tab-bar">
     <div class="tab active" onclick="switchTab('ORDERS',this)">ORDERS <span class="count-badge" id="ordersCount">0</span></div>
     <div class="tab" onclick="switchTab('MODS',this)">MODS <span class="count-badge" id="modsCount">0</span></div>
+  </div>
+  <div class="search-wrap">
+    <input class="search-input" id="searchInput" placeholder="Search customer..." oninput="renderOrders()">
   </div>
   <div class="content" id="orderList"></div>
 </div>
@@ -246,6 +286,7 @@ function getHTML() {
 <div class="modal-overlay" id="modal">
   <div class="modal">
     <div class="modal-title" id="modalTitle">Update Order</div>
+    <div class="modal-sub" id="modalSub"></div>
     <div class="field-label">Status</div>
     <select id="selStatus">
       <option value="">— select —</option>
@@ -255,7 +296,7 @@ function getHTML() {
       <option>Cancelled</option>
       <option>Scheduled</option>
       <option>On Delivery</option>
-      <option>Delivery Problem</option>
+      <option>Failed</option>
     </select>
     <div class="field-label">Courier</div>
     <select id="selCourier">
@@ -284,6 +325,8 @@ function getHTML() {
       <option>Unpaid</option>
       <option>No Revenue</option>
     </select>
+    <div class="field-label" id="commentLabel">Comment</div>
+    <textarea id="selComment" placeholder="Add a comment..."></textarea>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeModal()">Cancel</button>
       <button class="btn-save" id="saveBtn" onclick="saveUpdate()">Save</button>
@@ -292,15 +335,13 @@ function getHTML() {
 </div>
 
 <script>
-  const BASE = window.location.href.split('?')[0];
-  let pw = "", currentTab = "ORDERS", currentRow = null;
-  let allOrders = { ORDERS: [], MODS: [] };
+  var BASE = window.location.href.split("?")[0];
+  var pw = "", currentTab = "ORDERS", currentRow = null;
+  var allOrders = { ORDERS: [], MODS: [] };
 
   function login() {
     pw = document.getElementById("pwInput").value.trim();
-    var now  = new Date();
-    var date = (now.getMonth()+1) + "/" + now.getDate() + "/" + now.getFullYear();
-    fetch(BASE + "?action=getOrders&sheet=ORDERS&pw=" + pw + "&date=" + date)
+    fetch(BASE + "?action=getOrders&sheet=ORDERS&pw=" + pw)
       .then(function(r) { return r.json(); })
       .then(function(data) {
         if (data.error) {
@@ -309,8 +350,9 @@ function getHTML() {
         }
         document.getElementById("loginWrap").style.display = "none";
         document.getElementById("mainApp").style.display   = "block";
-        allOrders.ORDERS = data;
-        document.getElementById("ordersCount").textContent = data.length;
+        allOrders.ORDERS = data.orders || [];
+        document.getElementById("ordersCount").textContent = allOrders.ORDERS.length;
+        updateDashboard(data.dashboard);
         loadTab("MODS");
         renderOrders();
         setDateLabel();
@@ -318,20 +360,32 @@ function getHTML() {
   }
 
   function loadTab(sheet) {
-    var now  = new Date();
-    var date = (now.getMonth()+1) + "/" + now.getDate() + "/" + now.getFullYear();
-    fetch(BASE + "?action=getOrders&sheet=" + sheet + "&pw=" + pw + "&date=" + date)
+    fetch(BASE + "?action=getOrders&sheet=" + sheet + "&pw=" + pw)
       .then(function(r) { return r.json(); })
       .then(function(data) {
-        allOrders[sheet] = data;
-        document.getElementById(sheet === "ORDERS" ? "ordersCount" : "modsCount").textContent = data.length;
+        allOrders[sheet] = data.orders || [];
+        document.getElementById(sheet === "ORDERS" ? "ordersCount" : "modsCount").textContent = allOrders[sheet].length;
         if (sheet === currentTab) renderOrders();
       });
   }
 
+  function updateDashboard(d) {
+    if (!d) return;
+    document.getElementById("dashOrders").textContent    = d.todayOrders    || "—";
+    document.getElementById("dashDelivery").textContent  = d.onDelivery     || "—";
+    document.getElementById("dashDelivered").textContent = d.deliveredToday || "—";
+  }
+
   function refreshOrders() {
     document.getElementById("orderCount").textContent = "Refreshing...";
-    loadTab("ORDERS");
+    fetch(BASE + "?action=getOrders&sheet=ORDERS&pw=" + pw)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        allOrders.ORDERS = data.orders || [];
+        document.getElementById("ordersCount").textContent = allOrders.ORDERS.length;
+        updateDashboard(data.dashboard);
+        if (currentTab === "ORDERS") renderOrders();
+      });
     loadTab("MODS");
   }
 
@@ -345,32 +399,44 @@ function getHTML() {
     currentTab = tab;
     document.querySelectorAll(".tab").forEach(function(t) { t.classList.remove("active"); });
     el.classList.add("active");
+    document.getElementById("searchInput").value = "";
     renderOrders();
   }
 
   function renderOrders() {
+    var query  = document.getElementById("searchInput").value.toLowerCase().trim();
     var orders = allOrders[currentTab] || [];
-    var list   = document.getElementById("orderList");
+    if (query) {
+      orders = orders.filter(function(o) {
+        return o.customer.toLowerCase().indexOf(query) >= 0 ||
+               o.contact.toLowerCase().indexOf(query) >= 0 ||
+               o.location.toLowerCase().indexOf(query) >= 0;
+      });
+    }
+    var list = document.getElementById("orderList");
     document.getElementById("orderCount").textContent = orders.length + " order(s) today";
     if (!orders.length) {
-      list.innerHTML = '<div class="empty">No orders for today</div>';
+      list.innerHTML = '<div class="empty">No orders found</div>';
       return;
     }
     list.innerHTML = orders.map(function(o, idx) {
       var sc = o.status.toLowerCase().indexOf("deliver") >= 0 ? "delivered"
              : o.status.toLowerCase() === "reconfirm"         ? "reconfirm"
              : o.status.toLowerCase() === "cancelled"          ? "cancelled"
-             : o.status.toLowerCase() === "rescheduled"        ? "rescheduled" : "";
+             : o.status.toLowerCase() === "rescheduled"        ? "rescheduled"
+             : o.status.toLowerCase() === "failed"             ? "failed" : "";
+      var realIdx = allOrders[currentTab].indexOf(o);
       return '<div class="order-card ' + (o._updated ? "updated" : "") + '">' +
         '<div class="order-name">' + o.customer + '</div>' +
         '<div class="order-meta">' +
           '📍 ' + o.location + '<br>' +
           '📞 ' + o.contact + '<br>' +
           '📦 ' + o.product + ' x' + o.qty + ' — ' + o.price + '<br>' +
-          '🧑‍💼 ' + o.operator + (o.courier ? ' | 🚗 ' + o.courier : '') +
+          '🧑 ' + o.operator + (o.courier ? ' | 🚗 ' + o.courier : '') +
         '</div>' +
+        (o.comment ? '<div class="order-comment">💬 ' + o.comment + '</div>' : '') +
         (o.status ? '<div class="order-status ' + sc + '">' + o.status + (o.customerPayment ? ' · ' + o.customerPayment : '') + '</div>' : '') +
-        '<button class="update-btn" onclick="openModal(' + idx + ')">Update</button>' +
+        '<button class="update-btn" onclick="openModal(' + realIdx + ')">Update</button>' +
       '</div>';
     }).join("");
   }
@@ -378,11 +444,14 @@ function getHTML() {
   function openModal(idx) {
     var o = allOrders[currentTab][idx];
     currentRow = { row: o.row, idx: idx };
-    document.getElementById("modalTitle").textContent   = o.customer;
-    document.getElementById("selStatus").value          = o.status          || "";
-    document.getElementById("selCourier").value         = o.courier         || "";
-    document.getElementById("selCustomerPay").value     = o.customerPayment || "";
-    document.getElementById("selRiderPay").value        = o.riderPayment    || "";
+    document.getElementById("modalTitle").textContent  = o.customer;
+    document.getElementById("modalSub").textContent    = o.location + " · " + o.contact;
+    document.getElementById("selStatus").value         = o.status          || "";
+    document.getElementById("selCourier").value        = o.courier         || "";
+    document.getElementById("selCustomerPay").value    = o.customerPayment || "";
+    document.getElementById("selRiderPay").value       = o.riderPayment    || "";
+    document.getElementById("selComment").value        = o.comment         || "";
+    document.getElementById("commentLabel").textContent = currentTab === "MODS" ? "Backoffice Comment" : "Delivery Team Comment";
     document.getElementById("modal").classList.add("open");
   }
 
@@ -398,6 +467,7 @@ function getHTML() {
     var courier         = document.getElementById("selCourier").value;
     var customerPayment = document.getElementById("selCustomerPay").value;
     var riderPayment    = document.getElementById("selRiderPay").value;
+    var comment         = document.getElementById("selComment").value;
 
     btn.textContent = "Saving...";
     btn.disabled    = true;
@@ -407,7 +477,8 @@ function getHTML() {
       "&status=" + encodeURIComponent(status) +
       "&courier=" + encodeURIComponent(courier) +
       "&customerPayment=" + encodeURIComponent(customerPayment) +
-      "&riderPayment=" + encodeURIComponent(riderPayment);
+      "&riderPayment=" + encodeURIComponent(riderPayment) +
+      "&comment=" + encodeURIComponent(comment);
 
     fetch(BASE + "?" + params)
       .then(function(r) { return r.json(); })
@@ -417,6 +488,7 @@ function getHTML() {
         if (courier)         o.courier         = courier;
         if (customerPayment) o.customerPayment = customerPayment;
         if (riderPayment)    o.riderPayment    = riderPayment;
+        if (comment)         o.comment         = comment;
         o._updated = true;
         btn.textContent = "Save";
         btn.disabled    = false;
