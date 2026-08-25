@@ -32,10 +32,9 @@ export default async function handler(req, res) {
       const courier         = url.searchParams.get("courier")         || "";
       const customerPayment = url.searchParams.get("customerPayment") || "";
       const riderPayment    = url.searchParams.get("riderPayment")    || "";
-      await updateSheetRow(token, sheet, row, status, courier, customerPayment, riderPayment);
-      return res.status(200).json({ ok: true });
+      const result = await updateSheetRow(token, sheet, row, status, courier, customerPayment, riderPayment);
+      return res.status(200).json({ ok: true, result });
     }
-
     return res.status(400).json({ error: "Unknown action" });
 
   } catch (err) {
@@ -120,7 +119,7 @@ async function getSheetRows(token, sheetName, range) {
 async function updateSheetRow(token, sheetName, rowNum, status, courier, customerPayment, riderPayment) {
   const range  = `${sheetName}!E${rowNum}:H${rowNum}`;
   const values = [[status, courier, customerPayment, riderPayment]];
-  await fetch(
+  const res = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
     {
       method:  "PUT",
@@ -131,8 +130,10 @@ async function updateSheetRow(token, sheetName, rowNum, status, courier, custome
       body: JSON.stringify({ range, majorDimension: "ROWS", values })
     }
   );
+  const data = await res.json();
+  console.log("Update response:", JSON.stringify(data));
+  return data;
 }
-
 async function getTodayOrders(token, sheetName) {
   const headerRow = sheetName === "MODS" ? 4 : 7;
   const rows = await getSheetRows(token, sheetName, `A${headerRow}:N`);
