@@ -28,9 +28,13 @@ export default async function handler(req, res) {
     }
 
     if (action === "debug") {
-  const rows1 = await getSheetRows(token, sheet, "A3050:B3060");
-  const rows2 = await getSheetRows(token, sheet, "A7:B8");
-  return res.status(200).json({ rows1, rows2, sheet });
+  const token2 = await getAccessToken();
+  const testUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/ORDERS!A1:B5`;
+  const testRes = await fetch(testUrl, {
+    headers: { Authorization: `Bearer ${token2}` }
+  });
+  const testData = await testRes.json();
+  return res.status(200).json({ testData, sheet });
 }
 
     if (action === "updateRow") {
