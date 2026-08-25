@@ -28,10 +28,9 @@ export default async function handler(req, res) {
     }
 
     if (action === "debug") {
-  const rows1 = await getSheetRows(token, sheet, "A1:B5");
-  const rows2 = await getSheetRows(token, sheet, "A7:B15");
-  const rows3 = await getSheetRows(token, sheet, "A3050:B3060");
-  return res.status(200).json({ rows1, rows2, rows3, sheet });
+  const rows1 = await getSheetRows(token, sheet, "A3050:B3060");
+  const rows2 = await getSheetRows(token, sheet, "A7:B8");
+  return res.status(200).json({ rows1, rows2, sheet });
 }
 
     if (action === "updateRow") {
