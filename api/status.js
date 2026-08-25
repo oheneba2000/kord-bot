@@ -22,10 +22,8 @@ export default async function handler(req, res) {
     const token = await getAccessToken();
 
     if (action === "getOrders") {
-      const dateStr = url.searchParams.get("date") || "";
-      const rows    = await getSheetRows(token, sheet, "A3050:A3060");
-      const orders  = await getTodayOrders(token, sheet, dateStr);
-      return res.status(200).json({ orders, sampleDates: rows, dateStr });
+      const orders = await getTodayOrders(token, sheet);
+      return res.status(200).json(orders);
     }
 
     if (action === "updateRow") {
@@ -135,17 +133,15 @@ async function updateSheetRow(token, sheetName, rowNum, status, courier, custome
   );
 }
 
-async function getTodayOrders(token, sheetName, dateStr) {
+async function getTodayOrders(token, sheetName) {
   const headerRow = sheetName === "MODS" ? 4 : 7;
   const rows = await getSheetRows(token, sheetName, `A${headerRow}:N4000`);
 
-  const todayStr = dateStr || (() => {
-    const now  = new Date();
-    const mm   = String(now.getMonth() + 1);
-    const dd   = String(now.getDate());
-    const yyyy = String(now.getFullYear());
-    return mm + "/" + dd + "/" + yyyy;
-  })();
+  const now     = new Date();
+  const dd      = String(now.getDate());
+  const months  = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const mmm     = months[now.getMonth()];
+  const todayStr = dd + "-" + mmm;
 
   const orders = [];
   rows.forEach(function(row, idx) {
