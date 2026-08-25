@@ -65,40 +65,57 @@ async function getAccessToken() {
     iat:   now
   };
 
-  const header  = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  const payload = base64url(JSON.stringify(claim));
-  const input   = `${header}.${payload}`;
+  const header  = toBase64Url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const payload = toBase64Url(JSON.stringify(claim));
+  const input   = header + "." + payload;
 
-  const keyData   = PRIVATE_KEY.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g, "");
-  const binaryKey = Uint8Array.from(atob(keyData), c => c.charCodeAt(0));
+  const keyData   = PRIVATE_KEY
+    .replace("-----BEGIN PRIVATE KEY-----", "")
+    .replace("-----END PRIVATE KEY-----", "")
+    .replace(/\n/g, "")
+    .trim();
+
+  const binaryKey = Uint8Array.from(atob(keyData), function(c) { return c.charCodeAt(0); });
 
   const cryptoKey = await crypto.subtle.importKey(
-    "pkcs8", binaryKey.buffer,
+    "pkcs8",
+    binaryKey.buffer,
     { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false, ["sign"]
+    false,
+    ["sign"]
   );
 
+  const encoder   = new TextEncoder();
   const signature = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5", cryptoKey,
-    new TextEncoder().encode(input)
+    "RSASSA-PKCS1-v1_5",
+    cryptoKey,
+    encoder.encode(input)
   );
 
-  const sig = base64url(String.fromCharCode(...new Uint8Array(signature)));
-  const jwt = `${input}.${sig}`;
+  const sigBytes = new Uint8Array(signature);
+  let sigStr = "";
+  sigBytes.forEach(function(b) { sigStr += String.fromCharCode(b); });
+  const sig = toBase64Url(sigStr, true);
+
+  const jwt = input + "." + sig;
 
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method:  "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body:    `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
+    body:    "grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=" + jwt
   });
+
   const data = await res.json();
   return data.access_token;
 }
 
-function base64url(str) {
-  const b64 = typeof str === "string"
-    ? btoa(unescape(encodeURIComponent(str)))
-    : btoa(str);
+function toBase64Url(str, isBinary) {
+  var b64;
+  if (isBinary) {
+    b64 = btoa(str);
+  } else {
+    b64 = btoa(unescape(encodeURIComponent(str)));
+  }
   return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
