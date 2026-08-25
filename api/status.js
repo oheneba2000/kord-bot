@@ -28,9 +28,9 @@ export default async function handler(req, res) {
     }
 
     if (action === "debug") {
-      const rows = await getSheetRows(token, sheet, "A7:A20");
-      return res.status(200).json({ rows, date: url.searchParams.get("date") });
-    }
+  const rows = await getSheetRows(token, sheet, "A1:A10");
+  return res.status(200).json({ rows, date: url.searchParams.get("date"), sheet });
+}
 
     if (action === "updateRow") {
       const row             = parseInt(url.searchParams.get("row"));
