@@ -27,16 +27,6 @@ export default async function handler(req, res) {
       return res.status(200).json(orders);
     }
 
-    if (action === "debug") {
-  const token2 = await getAccessToken();
-  const testUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/ORDERS!A1:B5`;
-  const testRes = await fetch(testUrl, {
-    headers: { Authorization: `Bearer ${token2}` }
-  });
-  const testData = await testRes.json();
-  return res.status(200).json({ testData, sheet });
-}
-
     if (action === "updateRow") {
       const row             = parseInt(url.searchParams.get("row"));
       const status          = url.searchParams.get("status")          || "";
@@ -146,7 +136,7 @@ async function updateSheetRow(token, sheetName, rowNum, status, courier, custome
 
 async function getTodayOrders(token, sheetName, dateStr) {
   const headerRow = sheetName === "MODS" ? 4 : 7;
-  const rows      = await getSheetRows(token, sheetName, `A${headerRow}:N1000`);
+  const rows = await getSheetRows(token, sheetName, `A${headerRow}:N4000`);
 
   const todayStr = dateStr || (() => {
     const now  = new Date();
