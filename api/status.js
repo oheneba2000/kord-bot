@@ -22,7 +22,8 @@ export default async function handler(req, res) {
     const token = await getAccessToken();
 
     if (action === "getOrders") {
-      const orders = await getTodayOrders(token, sheet);
+      const dateStr = url.searchParams.get("date") || "";
+      const orders  = await getTodayOrders(token, sheet, dateStr);
       return res.status(200).json(orders);
     }
 
@@ -116,15 +117,17 @@ async function updateSheetRow(token, sheetName, rowNum, status, courier, custome
   );
 }
 
-async function getTodayOrders(token, sheetName) {
+async function getTodayOrders(token, sheetName, dateStr) {
   const headerRow = sheetName === "MODS" ? 4 : 7;
   const rows      = await getSheetRows(token, sheetName, `A${headerRow}:N1000`);
 
-  const now      = new Date();
-  const mm       = String(now.getMonth() + 1);
-  const dd       = String(now.getDate());
-  const yyyy     = String(now.getFullYear());
-  const todayStr = mm + "/" + dd + "/" + yyyy;
+  const todayStr = dateStr || (() => {
+    const now  = new Date();
+    const mm   = String(now.getMonth() + 1);
+    const dd   = String(now.getDate());
+    const yyyy = String(now.getFullYear());
+    return mm + "/" + dd + "/" + yyyy;
+  })();
 
   const orders = [];
   rows.forEach(function(row, idx) {
@@ -280,7 +283,9 @@ function getHTML() {
 
   function login() {
     pw = document.getElementById("pwInput").value.trim();
-    fetch(BASE + "?action=getOrders&sheet=ORDERS&pw=" + pw)
+    var now  = new Date();
+    var date = (now.getMonth()+1) + "/" + now.getDate() + "/" + now.getFullYear();
+    fetch(BASE + "?action=getOrders&sheet=ORDERS&pw=" + pw + "&date=" + date)
       .then(function(r) { return r.json(); })
       .then(function(data) {
         if (data.error) {
@@ -298,7 +303,9 @@ function getHTML() {
   }
 
   function loadTab(sheet) {
-    fetch(BASE + "?action=getOrders&sheet=" + sheet + "&pw=" + pw)
+    var now  = new Date();
+    var date = (now.getMonth()+1) + "/" + now.getDate() + "/" + now.getFullYear();
+    fetch(BASE + "?action=getOrders&sheet=" + sheet + "&pw=" + pw + "&date=" + date)
       .then(function(r) { return r.json(); })
       .then(function(data) {
         allOrders[sheet] = data;
