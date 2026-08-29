@@ -421,6 +421,3 @@ async function sendMessage(chatId, text, replyToId) {
   });
 }
 
-function doGet(e) {
-  return new Response("KORD Bot is running.");
-}
