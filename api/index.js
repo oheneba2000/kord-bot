@@ -34,6 +34,16 @@ async function handleUpdate(update) {
 
   // ── Private DM commands ────────────────────────────
   if (!isOrderGroup) {
+    const trimmed = text.trim();
+
+    // Forwarded / pasted order — cache it so /store can pull the contact automatically
+    if (!trimmed.startsWith("/") && isOrder(text)) {
+      await cacheOrderForChat(chatId, text);
+      const name = extractField(text, "Name|Customer") || "order";
+      await sendMessage(chatId, "📦 Got it — " + name + ". Reply with /store CourierName to assign a courier.");
+      return;
+    }
+
     // /store Prince 0244745477
     if (text.startsWith("/store ")) {
       await handleStore(msg);
@@ -56,10 +66,11 @@ async function handleUpdate(update) {
     }
     await sendMessage(chatId,
       "✅ KORD Bot commands:\n\n" +
-      "/store Prince 0244745477 — store courier for a contact\n" +
-      "/stored — show all stored pairs\n" +
-      "/assign — assign all stored couriers to sheet\n" +
-      "/clear — clear all stored pairs"
+      "Forward me an order, then reply /store CourierName — I'll grab the contact for you\n" +
+      "/store Prince 0244745477 — or store a courier + contact manually\n" +
+      "/stored — show what's still queued\n" +
+      "/assign — assign everything queued to the sheet (checks ORDERS and MODS) in one go\n" +
+      "/clear — wipe leftover queue entries from memory only (never touches the sheet); use at end of day for anything that never matched"
     );
     return;
   }
@@ -70,22 +81,46 @@ async function handleUpdate(update) {
   }
 }
 
-// ─── /store Prince 0244745477 ──────────────────────────
+// ─── /store Prince [0244745477] ─────────────────────────
 async function handleStore(msg) {
   const chatId = msg.chat.id;
   const parts  = msg.text.trim().split(/\s+/);
 
-  if (parts.length < 3) {
-    await sendMessage(chatId, "⚠️ Format: /store CourierName ContactNumber\nExample: /store Prince 0244745477");
+  if (parts.length < 2) {
+    await sendMessage(chatId, "⚠️ Format: /store CourierName [ContactNumber]\nExample: /store Prince 0244745477\nOr forward the order first, then just: /store Prince");
     return;
   }
 
   const courier = parts[1];
-  const contact = normalizeContact(parts[2]);
+  let contact = "";
 
-  if (!contact) {
-    await sendMessage(chatId, "⚠️ Invalid contact number: " + parts[2]);
-    return;
+  if (parts.length >= 3) {
+    // Explicit contact number given — works exactly as before
+    contact = normalizeContact(parts[2]);
+    if (!contact) {
+      await sendMessage(chatId, "⚠️ Invalid contact number: " + parts[2]);
+      return;
+    }
+  } else {
+    // No contact given — pull it from a replied-to order, or the last order forwarded to this chat
+    const orderText =
+      (msg.reply_to_message && (msg.reply_to_message.text || msg.reply_to_message.caption)) ||
+      (await getCachedOrderForChat(chatId));
+
+    if (!orderText) {
+      await sendMessage(chatId, "⚠️ No order on file. Forward the order to me first, then send /store " + courier);
+      return;
+    }
+
+    const rawContact = extractField(orderText, "Contact|Phone|Tel")
+      .replace(/\[([^\]]+)\]\(tel:[^\)]+\)/g, "$1")
+      .replace(/[\s\-\(\)]/g, "");
+    contact = normalizeContact(rawContact);
+
+    if (!contact) {
+      await sendMessage(chatId, "⚠️ Couldn't find a valid contact number in that order. Use /store " + courier + " ContactNumber instead.");
+      return;
+    }
   }
 
   await redisSet("courier:" + contact, JSON.stringify({
@@ -154,33 +189,49 @@ async function handleAssign(msg) {
   await sendMessage(chatId, "⏳ Processing " + list.length + " assignments...");
 
   try {
-    const token = await getAccessToken();
-    const rows  = await getSheetRows(token, "ORDERS", "A7:D");
+    const token       = await getAccessToken();
+    const ordersRows  = await getSheetRows(token, "ORDERS", "A7:D");
+    const modsRows    = await getSheetRows(token, "MODS",   "A4:D");
 
-    const assigned   = [];
-    const notFound   = [];
+    const assigned = [];
+    const notFound = [];
+    const remaining = []; // contacts that stay queued (no match found)
 
     for (const contact of list) {
       const raw  = await redisGet("courier:" + contact);
       const data = raw ? JSON.parse(raw) : null;
       if (!data) continue;
 
-      // Find row by contact number
-      let foundRow = -1;
-      for (let i = 0; i < rows.length; i++) {
-        const rowContact = normalizeContact(String(rows[i][3] || ""));
-        if (rowContact === contact) {
-          foundRow = 7 + i;
-          break;
+      // Search ORDERS first (header row 7), then MODS (header row 4)
+      let sheetName = null, foundRow = -1;
+
+      for (let i = 0; i < ordersRows.length; i++) {
+        const rowContact = normalizeContact(String(ordersRows[i][3] || ""));
+        if (rowContact === contact) { sheetName = "ORDERS"; foundRow = 7 + i; break; }
+      }
+      if (foundRow < 0) {
+        for (let i = 0; i < modsRows.length; i++) {
+          const rowContact = normalizeContact(String(modsRows[i][3] || ""));
+          if (rowContact === contact) { sheetName = "MODS"; foundRow = 4 + i; break; }
         }
       }
 
       if (foundRow > 0) {
-        await writeSheetCell(token, "ORDERS", "F" + foundRow, data.courier);
-        assigned.push(data.courier + " → " + contact);
+        await writeSheetCell(token, sheetName, "F" + foundRow, data.courier);
+        assigned.push(data.courier + " → " + contact + " (" + sheetName + ")");
+        // Successfully assigned — remove from the queue immediately
+        await redisDel("courier:" + contact);
       } else {
-        notFound.push(data.courier + " → " + contact + " (not found in sheet)");
+        notFound.push(data.courier + " → " + contact + " (not found in ORDERS or MODS)");
+        remaining.push(contact);
       }
+    }
+
+    // Rewrite the queue to only contain contacts that still need attention
+    if (remaining.length) {
+      await redisSet("courier:list", JSON.stringify(remaining));
+    } else {
+      await redisDel("courier:list");
     }
 
     let reply = "";
@@ -188,7 +239,7 @@ async function handleAssign(msg) {
       reply += "✅ Assigned (" + assigned.length + "):\n" + assigned.join("\n");
     }
     if (notFound.length) {
-      reply += "\n\n⚠️ Not found (" + notFound.length + "):\n" + notFound.join("\n");
+      reply += "\n\n⚠️ Still pending (" + notFound.length + "):\n" + notFound.join("\n");
     }
 
     await sendMessage(chatId, reply || "Nothing processed.");
@@ -408,6 +459,21 @@ async function redisDel(key) {
   await fetch(UPSTASH_URL + "/del/" + encodeURIComponent(key), {
     headers: { Authorization: "Bearer " + UPSTASH_TOKEN }
   });
+}
+
+async function redisSetEx(key, value, seconds) {
+  await fetch(UPSTASH_URL + "/setex/" + encodeURIComponent(key) + "/" + seconds + "/" + encodeURIComponent(value), {
+    headers: { Authorization: "Bearer " + UPSTASH_TOKEN }
+  });
+}
+
+// ─── Last forwarded order per chat (12 hour expiry) ────
+async function cacheOrderForChat(chatId, text) {
+  await redisSetEx("lastOrder:" + chatId, text, 43200);
+}
+
+async function getCachedOrderForChat(chatId) {
+  return await redisGet("lastOrder:" + chatId);
 }
 
 // ─── Send Telegram message ─────────────────────────────
