@@ -379,11 +379,16 @@ function getHTML() {
 
   function buildCourierBar() {
     var bar  = document.getElementById("courierBar");
-    var html = "<div class='courier-chip active' onclick=\"filterCourier('All',this)\">All</div>";
+    var html = '<div class="courier-chip active" data-courier="All">All</div>';
     COURIERS.forEach(function(c) {
-     html += "<div class='courier-chip' onclick=\"filterCourier('" + c + "',this)\">" + c + "</div>";
+      html += '<div class="courier-chip" data-courier="' + c + '">' + c + '</div>';
     });
     bar.innerHTML = html;
+    bar.querySelectorAll(".courier-chip").forEach(function(chip) {
+      chip.addEventListener("click", function() {
+        filterCourier(chip.getAttribute("data-courier"), chip);
+      });
+    });
   }
 
   function filterCourier(name, el) {
