@@ -4,6 +4,12 @@ const GROUP_1    = -1003837168073;
 const GROUP_2    = -1003757012314;
 const BACKOFFICE = -1003681110338;
 
+const COURIERS = [
+  "Prince","Embeunice","Innocent","Mathew","Takoradi","Tarkwa","Christopher","Adu",
+  "Charles","Ernest","Richard","Abdul","AT","Gertrude","Amos","Jesse","Michael",
+  "Cape Coast","Foster","Paul","Vimax","Eric","Padmore"
+];
+
 const UPSTASH_URL   = "https://crack-minnow-180173.upstash.io";
 const UPSTASH_TOKEN = "gQAAAAAAAr_NAAIgcDIxOGJjMTRhMGE2OTc0NmE0YjRkNTViMWYwNzM4ZjgxZg";
 
@@ -25,6 +31,18 @@ export default async function handler(req, res) {
 }
 
 async function handleUpdate(update) {
+  // Courier button tapped
+  if (update.callback_query) {
+    await handleCallbackQuery(update.callback_query);
+    return;
+  }
+
+  // Reaction on an order message — check if it's the admin's 👍
+  if (update.message_reaction) {
+    await handleReaction(update.message_reaction);
+    return;
+  }
+
   if (!update.message) return;
   const msg    = update.message;
   const chatId = msg.chat.id;
@@ -36,11 +54,25 @@ async function handleUpdate(update) {
   if (!isOrderGroup) {
     const trimmed = text.trim();
 
-    // Forwarded / pasted order — cache it so /store can pull the contact automatically
+    // Forwarded / pasted order — extract the contact and show a courier picker
     if (!trimmed.startsWith("/") && isOrder(text)) {
-      await cacheOrderForChat(chatId, text);
+      await cacheOrderForChat(chatId, text); // fallback for /store CourierName without tapping
       const name = extractField(text, "Name|Customer") || "order";
-      await sendMessage(chatId, "📦 Got it — " + name + ". Reply with /store CourierName to assign a courier.");
+
+      const rawContact = extractField(text, "Contact|Phone|Tel")
+        .replace(/\[([^\]]+)\]\(tel:[^\)]+\)/g, "$1")
+        .replace(/[\s\-\(\)]/g, "");
+      const contact = normalizeContact(rawContact);
+
+      if (!contact) {
+        await sendMessage(chatId, "📦 Got it — " + name + ". I couldn't read a valid contact number from this order — use /store CourierName ContactNumber instead.");
+        return;
+      }
+
+      const sent = await sendMessage(chatId, "📦 " + name + " (" + contact + ") — choose a courier:", null, buildCourierKeyboard());
+      if (sent && sent.message_id) {
+        await redisSetEx("orderPicker:" + chatId + ":" + sent.message_id, JSON.stringify({ name, contact }), 43200);
+      }
       return;
     }
 
@@ -66,7 +98,7 @@ async function handleUpdate(update) {
     }
     await sendMessage(chatId,
       "✅ KORD Bot commands:\n\n" +
-      "Forward me an order, then reply /store CourierName — I'll grab the contact for you\n" +
+      "Forward me an order — I'll show courier buttons to tap\n" +
       "/store Prince 0244745477 — or store a courier + contact manually\n" +
       "/stored — show what's still queued\n" +
       "/assign — assign everything queued to the sheet (checks ORDERS and MODS) in one go\n" +
@@ -78,10 +110,116 @@ async function handleUpdate(update) {
   // ── Order validation in groups ─────────────────────
   if (isOrderGroup && isOrder(text)) {
     await validateOrder(msg);
+    await maybeTrackForReaction(msg, text);
   }
 }
 
-// ─── /store Prince [0244745477] ─────────────────────────
+// ─── React-reminder tracking (same-day orders, 6am–6pm) ─
+async function maybeTrackForReaction(msg, text) {
+  const chatId = msg.chat.id;
+  const msgId  = msg.message_id;
+
+  const now  = new Date(); // UTC == Ghana time, no offset needed
+  const hour = now.getUTCHours();
+  if (hour < 6 || hour >= 18) return; // outside 6am–6pm window — ignore
+
+  const dateStr = extractField(text, "Date");
+  if (!dateStr || !isSameDay(dateStr, now)) return; // not a same-day order — ignore
+
+  const name    = extractField(text, "Name|Customer") || "—";
+  const contact = extractField(text, "Contact|Phone|Tel") || "—";
+
+  const key  = chatId + ":" + msgId;
+  const data = { chatId, msgId, name, contact, postedAt: Date.now() };
+
+  await redisSetEx("reactPending:" + key, JSON.stringify(data), 86400);
+
+  const listRaw = await redisGet("reactPending:list");
+  const list    = listRaw ? JSON.parse(listRaw) : [];
+  list.push(key);
+  await redisSet("reactPending:list", JSON.stringify(list));
+}
+
+function isSameDay(dateStr, now) {
+  const m = dateStr.trim().match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2}|\d{4})$/);
+  if (!m) return false;
+  let d = parseInt(m[1], 10), mo = parseInt(m[2], 10), y = m[3];
+  y = y.length === 2 ? 2000 + parseInt(y, 10) : parseInt(y, 10);
+  return d === now.getUTCDate() && mo === (now.getUTCMonth() + 1) && y === now.getUTCFullYear();
+}
+
+// ─── Reaction received — clear the pending reminder ────
+async function handleReaction(mr) {
+  if (!mr.user || mr.user.id !== ADMIN_ID) return; // only the admin's own reaction counts
+
+  const hasThumbsUp = (mr.new_reaction || []).some(function(r) {
+    return r.type === "emoji" && r.emoji === "👍";
+  });
+  if (!hasThumbsUp) return;
+
+  const key = mr.chat.id + ":" + mr.message_id;
+  await redisDel("reactPending:" + key);
+
+  const listRaw = await redisGet("reactPending:list");
+  const list    = listRaw ? JSON.parse(listRaw) : [];
+  const idx     = list.indexOf(key);
+  if (idx >= 0) {
+    list.splice(idx, 1);
+    if (list.length) await redisSet("reactPending:list", JSON.stringify(list));
+    else await redisDel("reactPending:list");
+  }
+}
+
+// ─── Courier picker (inline keyboard) ──────────────────
+function buildCourierKeyboard() {
+  const rows = [];
+  for (let i = 0; i < COURIERS.length; i += 3) {
+    rows.push(COURIERS.slice(i, i + 3).map(function(c) {
+      return { text: c, callback_data: "storecourier:" + c };
+    }));
+  }
+  return { inline_keyboard: rows };
+}
+
+// ─── Courier button tapped ─────────────────────────────
+async function handleCallbackQuery(cq) {
+  const data = cq.data || "";
+  if (!data.startsWith("storecourier:")) {
+    await answerCallbackQuery(cq.id, "Unknown action");
+    return;
+  }
+
+  const courier  = data.substring("storecourier:".length);
+  const chatId   = cq.message.chat.id;
+  const pickerId = cq.message.message_id;
+
+  const raw = await redisGet("orderPicker:" + chatId + ":" + pickerId);
+  if (!raw) {
+    await answerCallbackQuery(cq.id, "This order expired — forward it again.");
+    return;
+  }
+
+  const order   = JSON.parse(raw);
+  const contact = order.contact;
+
+  await redisSet("courier:" + contact, JSON.stringify({
+    courier,
+    contact,
+    storedAt: Date.now()
+  }));
+
+  const listRaw = await redisGet("courier:list");
+  const list    = listRaw ? JSON.parse(listRaw) : [];
+  if (!list.includes(contact)) {
+    list.push(contact);
+    await redisSet("courier:list", JSON.stringify(list));
+  }
+
+  await redisDel("orderPicker:" + chatId + ":" + pickerId); // one-time use
+
+  await answerCallbackQuery(cq.id, "✅ " + courier + " assigned");
+  await editMessageText(chatId, pickerId, "✅ " + order.name + " (" + contact + ") → " + courier);
+}
 async function handleStore(msg) {
   const chatId = msg.chat.id;
   const parts  = msg.text.trim().split(/\s+/);
@@ -477,13 +615,32 @@ async function getCachedOrderForChat(chatId) {
 }
 
 // ─── Send Telegram message ─────────────────────────────
-async function sendMessage(chatId, text, replyToId) {
+async function sendMessage(chatId, text, replyToId, replyMarkup) {
   const payload = { chat_id: chatId, text };
-  if (replyToId) payload.reply_to_message_id = replyToId;
-  await fetch("https://api.telegram.org/bot" + BOT_TOKEN + "/sendMessage", {
+  if (replyToId)   payload.reply_to_message_id = replyToId;
+  if (replyMarkup) payload.reply_markup = replyMarkup;
+  const res  = await fetch("https://api.telegram.org/bot" + BOT_TOKEN + "/sendMessage", {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
     body:    JSON.stringify(payload)
+  });
+  const data = await res.json();
+  return data.result;
+}
+
+async function answerCallbackQuery(id, text) {
+  await fetch("https://api.telegram.org/bot" + BOT_TOKEN + "/answerCallbackQuery", {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ callback_query_id: id, text })
+  });
+}
+
+async function editMessageText(chatId, messageId, text) {
+  await fetch("https://api.telegram.org/bot" + BOT_TOKEN + "/editMessageText", {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ chat_id: chatId, message_id: messageId, text })
   });
 }
 
