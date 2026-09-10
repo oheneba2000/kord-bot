@@ -50,6 +50,9 @@ async function handleUpdate(update) {
   const userId = msg.from.id;
   const isOrderGroup = (chatId === GROUP_1 || chatId === GROUP_2);
 
+  // Log every message in the three tracked chats, regardless of type/content
+  await logMessage(msg);
+
   // ── Private DM commands ────────────────────────────
   if (!isOrderGroup) {
     const trimmed = text.trim();
@@ -603,6 +606,45 @@ async function redisSetEx(key, value, seconds) {
   await fetch(UPSTASH_URL + "/setex/" + encodeURIComponent(key) + "/" + seconds + "/" + encodeURIComponent(value), {
     headers: { Authorization: "Bearer " + UPSTASH_TOKEN }
   });
+}
+
+async function redisRPush(key, value) {
+  await fetch(UPSTASH_URL + "/rpush/" + encodeURIComponent(key) + "/" + encodeURIComponent(value), {
+    headers: { Authorization: "Bearer " + UPSTASH_TOKEN }
+  });
+}
+
+async function redisExpire(key, seconds) {
+  await fetch(UPSTASH_URL + "/expire/" + encodeURIComponent(key) + "/" + seconds, {
+    headers: { Authorization: "Bearer " + UPSTASH_TOKEN }
+  });
+}
+
+// ─── Message log (GROUP_1, GROUP_2, BACKOFFICE — 7 day retention) ─
+async function logMessage(msg) {
+  const chatId = msg.chat.id;
+  if (chatId !== GROUP_1 && chatId !== GROUP_2 && chatId !== BACKOFFICE) return;
+
+  const content = msg.text || msg.caption ||
+    (msg.photo ? "[photo]" : msg.document ? "[document]" : msg.sticker ? "[sticker]" :
+     msg.video ? "[video]" : msg.voice ? "[voice note]" : "[other]");
+
+  const sender = msg.from
+    ? ((msg.from.first_name || "") + (msg.from.last_name ? " " + msg.from.last_name : "")).trim() || msg.from.username || ("id:" + msg.from.id)
+    : "unknown";
+
+  const entry = {
+    chatId,
+    sender,
+    text: content,
+    ts:   (msg.date ? msg.date * 1000 : Date.now())
+  };
+
+  const dateKey = new Date(entry.ts).toISOString().slice(0, 10); // UTC == Ghana date
+  const listKey = "msglog:" + dateKey;
+
+  await redisRPush(listKey, JSON.stringify(entry));
+  await redisExpire(listKey, 7 * 86400); // keep 7 days
 }
 
 // ─── Last forwarded order per chat (12 hour expiry) ────
