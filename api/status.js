@@ -29,8 +29,9 @@ export default async function handler(req, res) {
     const token = await getAccessToken();
 
     if (action === "getOrders") {
-      const orders    = await getTodayOrders(token, sheet);
-      const dashboard = await getDashboard(token);
+      const date      = url.searchParams.get("date") || "";
+      const orders    = await getTodayOrders(token, sheet, date);
+      const dashboard = (!date || date === todayISO()) ? await getDashboard(token) : null;
       return res.status(200).json({ orders, dashboard });
     }
 
@@ -105,6 +106,10 @@ async function getSheetRows(token, sheetName, range) {
   return data.values || [];
 }
 
+function todayISO() {
+  return new Date().toISOString().slice(0, 10); // UTC == Ghana date
+}
+
 async function getDashboard(token) {
   const rows = await getSheetRows(token, "ORDERS", "B3:D3");
   if (!rows.length) return {};
@@ -145,21 +150,21 @@ async function updateSheetRow(token, sheetName, rowNum, status, courier, custome
   return data;
 }
 
-async function getTodayOrders(token, sheetName) {
+async function getTodayOrders(token, sheetName, dateISO) {
   const headerRow = sheetName === "MODS" ? 4 : 7;
   const rows      = await getSheetRows(token, sheetName, "A" + headerRow + ":O");
 
-  const now      = new Date();
-  const dd       = String(now.getDate());
-  const months   = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const mmm      = months[now.getMonth()];
-  const todayStr = dd + "-" + mmm;
+  const months  = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const target  = dateISO ? new Date(dateISO + "T00:00:00Z") : new Date();
+  const dd      = String(target.getUTCDate());
+  const mmm     = months[target.getUTCMonth()];
+  const wantStr = dd + "-" + mmm;
 
   const orders = [];
   rows.forEach(function(row, idx) {
     if (!row[0]) return;
     const dateVal = String(row[0]).trim();
-    if (dateVal !== todayStr) return;
+    if (dateVal !== wantStr) return;
     orders.push({
       row:             headerRow + idx,
       date:            row[0]  || "",
@@ -194,6 +199,10 @@ function getHTML() {
     .header { background: #8B0000; color: white; padding: 14px 20px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
     .header h1 { font-size: 17px; font-weight: 700; }
     .header p  { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+    .date-bar { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 8px 12px; background: #7a0000; }
+    .date-bar button { background: rgba(255,255,255,0.15); border: none; color: white; padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+    .date-bar button:active { background: rgba(255,255,255,0.3); }
+    .date-bar button.active { background: white; color: #8B0000; font-weight: 700; }
     .dashboard { display: flex; gap: 8px; padding: 10px 12px; background: #6b0000; }
     .dash-card { flex: 1; background: rgba(255,255,255,0.15); border-radius: 8px; padding: 8px; text-align: center; color: white; }
     .dash-num  { font-size: 20px; font-weight: 700; }
@@ -265,7 +274,12 @@ function getHTML() {
     <h1>KORD Status <span id="dateLabel"></span> <button class="refresh-btn" onclick="refreshOrders()">↻</button></h1>
     <p id="orderCount">Loading...</p>
   </div>
-  <div class="dashboard">
+  <div class="date-bar">
+    <button onclick="shiftDate(-1)">‹ Prev</button>
+    <button onclick="goToday()" id="todayBtn" class="active">Today</button>
+    <button onclick="shiftDate(1)">Next ›</button>
+  </div>
+  <div class="dashboard" id="dashboard">
     <div class="dash-card">
       <div class="dash-num" id="dashOrders">—</div>
       <div class="dash-lbl">Today</div>
@@ -345,11 +359,12 @@ function getHTML() {
   var BASE = window.location.href.split("?")[0];
   var pw = "", currentTab = "ORDERS", currentRow = null, activeCourier = "All";
   var allOrders = { ORDERS: [], MODS: [] };
+  var currentDate = new Date().toISOString().slice(0, 10);
   var COURIERS = ["Prince","Embeunice","Innocent","Mathew","Takoradi","Tarkwa","Christopher","Adu","Charles","Ernest","Richard","Abdul","AT","Gertrude","Amos","Jesse","Michael","Cape Coast","Foster","Paul","Vimax","Eric","Padmore"];
 
   function login() {
     pw = document.getElementById("pwInput").value.trim();
-    fetch(BASE + "?action=getOrders&sheet=ORDERS&pw=" + pw)
+    fetch(BASE + "?action=getOrders&sheet=ORDERS&pw=" + pw + "&date=" + currentDate)
       .then(function(r) { return r.json(); })
       .then(function(data) {
         if (data.error) {
@@ -369,7 +384,7 @@ function getHTML() {
   }
 
   function loadTab(sheet) {
-    fetch(BASE + "?action=getOrders&sheet=" + sheet + "&pw=" + pw)
+    fetch(BASE + "?action=getOrders&sheet=" + sheet + "&pw=" + pw + "&date=" + currentDate)
       .then(function(r) { return r.json(); })
       .then(function(data) {
         allOrders[sheet] = data.orders || [];
@@ -408,7 +423,7 @@ function getHTML() {
 
   function refreshOrders() {
     document.getElementById("orderCount").textContent = "Refreshing...";
-    fetch(BASE + "?action=getOrders&sheet=ORDERS&pw=" + pw)
+    fetch(BASE + "?action=getOrders&sheet=ORDERS&pw=" + pw + "&date=" + currentDate)
       .then(function(r) { return r.json(); })
       .then(function(data) {
         allOrders.ORDERS = data.orders || [];
@@ -420,9 +435,38 @@ function getHTML() {
   }
 
   function setDateLabel() {
-    var t = new Date();
+    var t = new Date(currentDate + "T00:00:00Z");
     document.getElementById("dateLabel").textContent =
-      t.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+      t.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+  }
+
+  function shiftDate(delta) {
+    var d = new Date(currentDate + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + delta);
+    currentDate = d.toISOString().slice(0, 10);
+    onDateChanged();
+  }
+
+  function goToday() {
+    currentDate = new Date().toISOString().slice(0, 10);
+    onDateChanged();
+  }
+
+  function onDateChanged() {
+    var isToday = currentDate === new Date().toISOString().slice(0, 10);
+    document.getElementById("todayBtn").classList.toggle("active", isToday);
+    document.getElementById("dashboard").style.display = isToday ? "flex" : "none";
+    setDateLabel();
+    document.getElementById("orderCount").textContent = "Loading...";
+    fetch(BASE + "?action=getOrders&sheet=ORDERS&pw=" + pw + "&date=" + currentDate)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        allOrders.ORDERS = data.orders || [];
+        document.getElementById("ordersCount").textContent = allOrders.ORDERS.length;
+        updateDashboard(data.dashboard);
+        if (currentTab === "ORDERS") renderOrders();
+      });
+    loadTab("MODS");
   }
 
   function switchTab(tab, el) {
