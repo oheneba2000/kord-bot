@@ -174,6 +174,7 @@ async function getTodayOrders(token, sheetName) {
       qty:             row[10] || "",
       price:           row[11] || "",
       operator:        row[12] || "",
+      admin:           row[13] || "",
       comment:         row[14] || ""
     });
   });
@@ -450,7 +451,8 @@ function getHTML() {
       orders = orders.filter(function(o) {
         return o.customer.toLowerCase().indexOf(query) >= 0 ||
                o.contact.toLowerCase().indexOf(query) >= 0 ||
-               o.location.toLowerCase().indexOf(query) >= 0;
+               o.location.toLowerCase().indexOf(query) >= 0 ||
+               o.admin.toLowerCase().indexOf(query) >= 0;
       });
     }
 
@@ -478,7 +480,7 @@ function getHTML() {
           '📍 ' + o.location + '<br>' +
           '📞 ' + o.contact + '<br>' +
           '📦 ' + o.product + ' x' + o.qty + ' — ' + o.price + '<br>' +
-          '🧑 ' + o.operator +
+          '🧑 ' + o.operator + (o.admin ? ' | 🗂 ' + o.admin : '') +
         '</div>' +
         courierLabel +
         (o.comment ? '<div class="order-comment">💬 ' + o.comment + '</div>' : '') +
